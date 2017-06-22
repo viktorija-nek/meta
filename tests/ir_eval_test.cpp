@@ -76,7 +76,9 @@ go_bandit([]() {
                        Is().GreaterThanOrEqualTo(0).And().LessThanOrEqualTo(1));
             AssertThat(eval.gmap(),
                        Is().GreaterThanOrEqualTo(0).And().LessThanOrEqualTo(1));
-
+			AssertThat(eval.mrr(),
+                       Is().GreaterThanOrEqualTo(0).And().LessThanOrEqualTo(1));
+					   
             // geometric mean of numbers is always <= arithmetic mean
             AssertThat(eval.map(), Is().GreaterThanOrEqualTo(eval.gmap()));
         });
@@ -88,6 +90,7 @@ go_bandit([]() {
             const double delta = 0.000001;
             AssertThat(eval.map(), EqualsWithDelta(0.0, delta));
             AssertThat(eval.gmap(), EqualsWithDelta(0.0, delta));
+			AssertThat(eval.mrr(), EqualsWithDelta(0.0, delta));
 
             // make some fake results based on the loaded qrels file
             std::vector<index::search_result> results;
@@ -158,8 +161,134 @@ go_bandit([]() {
 
             filesystem::remove_all("ceeaus");
         });
-    });
+		
+		it("should compute correct MRR measure (1 query: 1st is relevant)", []() {
+            auto file_cfg = tests::create_config("file");
+            index::ir_eval eval{*file_cfg};
+            const double delta = 0.000001;
+			AssertThat(eval.mrr(), EqualsWithDelta(0.0, delta));
 
+            // make some fake results based on the loaded qrels file
+            std::vector<index::search_result> results;
+            query_id qid{0};
+            
+			results.emplace_back(doc_id{0}, 1.0); // relevant
+            results.emplace_back(doc_id{2}, 0.9); // not relevant
+			results.emplace_back(doc_id{3}, 0.9); // not relevant
+			results.emplace_back(doc_id{4}, 0.9); // not relevant
+            results.emplace_back(doc_id{5}, 0.9); // not relevant
+            results.emplace_back(doc_id{1}, 1.0); // relevant
+            results.emplace_back(doc_id{6}, 0.8); // relevant
+
+            eval.avg_p(results, qid, 1000);
+			AssertThat(eval.mrr(), EqualsWithDelta(1.0, delta));
+
+            filesystem::remove_all("ceeaus");
+        });
+		
+		it("should compute correct MRR measure (1 query: 5th is relevant)", []() {
+            auto file_cfg = tests::create_config("file");
+            index::ir_eval eval{*file_cfg};
+            const double delta = 0.000001;
+			AssertThat(eval.mrr(), EqualsWithDelta(0.0, delta));
+
+            // make some fake results based on the loaded qrels file
+            std::vector<index::search_result> results;
+            query_id qid{0};
+            
+            results.emplace_back(doc_id{2}, 0.9); // not relevant
+			results.emplace_back(doc_id{3}, 0.9); // not relevant
+			results.emplace_back(doc_id{4}, 0.9); // not relevant
+            results.emplace_back(doc_id{5}, 0.9); // not relevant
+			results.emplace_back(doc_id{0}, 1.0); // relevant
+            results.emplace_back(doc_id{1}, 1.0); // relevant
+            results.emplace_back(doc_id{6}, 0.8); // relevant
+
+            eval.avg_p(results, qid, 1000);
+			AssertThat(eval.mrr(), EqualsWithDelta(0.2, delta));
+
+            filesystem::remove_all("ceeaus");
+        });
+		
+		it("should compute correct MRR measure (1 query: none is relevant)", []() {
+            auto file_cfg = tests::create_config("file");
+            index::ir_eval eval{*file_cfg};
+            const double delta = 0.000001;
+			AssertThat(eval.mrr(), EqualsWithDelta(0.0, delta));
+
+            // make some fake results based on the loaded qrels file
+            std::vector<index::search_result> results;
+            query_id qid{0};
+            
+            results.emplace_back(doc_id{2}, 0.9); // not relevant
+			results.emplace_back(doc_id{3}, 0.9); // not relevant
+			results.emplace_back(doc_id{4}, 0.9); // not relevant
+            results.emplace_back(doc_id{5}, 0.9); // not relevant
+
+            eval.avg_p(results, qid, 1000);
+			AssertThat(eval.mrr(), EqualsWithDelta(0.0, delta));
+
+            filesystem::remove_all("ceeaus");
+        });
+		
+		it("should compute correct MRR measure (5 queries: 5th, 2nd, 1st, none and 10th are relevant)", []() {
+            auto file_cfg = tests::create_config("file");
+            index::ir_eval eval{*file_cfg};
+            const double delta = 0.000001;
+			AssertThat(eval.mrr(), EqualsWithDelta(0.0, delta));
+
+            // make some fake results based on the loaded qrels file
+            std::vector<index::search_result> results;
+
+            results.emplace_back(doc_id{2}, 0.9); // not relevant
+			results.emplace_back(doc_id{3}, 0.9); // not relevant
+			results.emplace_back(doc_id{4}, 0.9); // not relevant
+            results.emplace_back(doc_id{5}, 0.9); // not relevant
+			results.emplace_back(doc_id{0}, 1.0); // relevant
+            eval.avg_p(results, query_id{0}, 1000);		  // MRR = 0.2	
+			results.clear();
+
+            results.emplace_back(doc_id{0}, 0.9); // not relevant
+			results.emplace_back(doc_id{1}, 0.9); // relevant
+			results.emplace_back(doc_id{3}, 0.9); // relevant
+            results.emplace_back(doc_id{4}, 0.9); // relevant
+            eval.avg_p(results, query_id{1}, 1000);		  // MRR = 0.5
+			results.clear();
+			
+			results.emplace_back(doc_id{17}, 0.9); // relevant
+			results.emplace_back(doc_id{0}, 0.9); // not relevant
+			results.emplace_back(doc_id{44}, 0.9); // relevant
+            results.emplace_back(doc_id{1}, 0.9); // not relevant
+            eval.avg_p(results, query_id{2}, 1000);		  // MRR = 1.0
+			results.clear();
+			
+			results.emplace_back(doc_id{0}, 0.9); // not relevant
+			results.emplace_back(doc_id{1}, 0.9); // not relevant
+			results.emplace_back(doc_id{3}, 0.9); // not relevant
+            results.emplace_back(doc_id{4}, 0.9); // not relevant
+            eval.avg_p(results, query_id{3}, 1000);		  // MRR = 0.0
+			results.clear();
+			
+			results.emplace_back(doc_id{0}, 0.9); // not relevant
+			results.emplace_back(doc_id{2}, 0.9); // not relevant
+			results.emplace_back(doc_id{3}, 0.9); // not relevant
+			results.emplace_back(doc_id{5}, 0.9); // not relevant
+			results.emplace_back(doc_id{7}, 0.9); // not relevant
+			results.emplace_back(doc_id{8}, 0.9); // not relevant
+			results.emplace_back(doc_id{9}, 0.9); // not relevant
+			results.emplace_back(doc_id{10}, 0.9); // not relevant
+			results.emplace_back(doc_id{11}, 0.9); // not relevant
+            results.emplace_back(doc_id{1}, 0.9); // relevant
+            eval.avg_p(results, query_id{4}, 1000);		  // MRR = 0.1
+			results.clear();
+			
+			AssertThat(eval.mrr(), EqualsWithDelta((0.2 + 0.5 + 1.0 + 0.0 + 0.1) / 5, delta)); // 1.8 / 5 = 0.36
+
+            filesystem::remove_all("ceeaus");
+        });
+    });
+	
+		
     // the magic numbers here are validated with an R implementation
     describe("[ir-eval] rank correlation metrics", []() {
         const double delta = 0.000001;

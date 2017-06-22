@@ -166,6 +166,7 @@ double ir_eval::avg_p(const std::vector<search_result>& results, query_id q_id,
     if (ht == qrels_.end() || results.empty())
     {
         scores_.push_back(0.0);
+		reciprocal_ranks_.push_back(0.0);
         return 0.0;
     }
 
@@ -175,12 +176,19 @@ double ir_eval::avg_p(const std::vector<search_result>& results, query_id q_id,
     uint64_t i = 1;
     double avgp = 0.0;
     double num_rel = 1;
+	bool added_r = false;
     for (auto& result : results)
     {
         if (map::safe_at(ht->second, result.d_id) != 0)
         {
             avgp += num_rel / i;
             ++num_rel;
+			
+			if (added_r == false)
+			{
+				reciprocal_ranks_.push_back(1 / (double) i);
+				added_r = true;
+			}
         }
         if (num_rel - 1 == total_relevant)
             break;
@@ -215,6 +223,15 @@ double ir_eval::gmap() const
     }
 
     return std::exp(sum / scores_.size());
+}
+
+double ir_eval::mrr() const
+{
+    if (reciprocal_ranks_.empty())
+        return 0.0;
+
+    return std::accumulate(reciprocal_ranks_.begin(), reciprocal_ranks_.end(), 0.0)
+           / reciprocal_ranks_.size();
 }
 
 void ir_eval::print_stats(const std::vector<search_result>& results,

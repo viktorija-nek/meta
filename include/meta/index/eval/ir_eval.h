@@ -106,6 +106,14 @@ class ir_eval
      * \f$ gMAP = \exp\{\frac{1}{n}\sum_{i=1}^n \log avg\_p(i)\}\f$
      */
     double gmap() const;
+	
+	/**
+     * @return the Mean Reciprocal Rank for a set of queries.
+     * Note that avg_p() must be called in order for the individual query scores
+     * to be calculated and saved.
+     * \f$ MRR = \frac{1}{n}\sum_{i=1}^n 1\i\f$
+     */
+    double mrr() const;
 
     /**
      * @param results The ranked list of results
@@ -131,6 +139,9 @@ class ir_eval
 
     /// Collection of scores used to calculate MAP and gMAP
     std::vector<double> scores_;
+	
+	/// Collection of reciprocal ranks used to calculate MRR
+    std::vector<double> reciprocal_ranks_;
 
     /**
      * @param path The path to the relevance judgements
